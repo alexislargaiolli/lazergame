@@ -1,32 +1,61 @@
 package fr.alex.games.entities;
 
-import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.math.Vector2;
 
 public class Lazer {
-	private static final float defaultLifeTime = 2f;
 	private Vector2 origin;
 	private Vector2 dest;
 	private Vector2 head;
 	private Vector2 queue;
 	private Vector2 direction;
-	private Vector2 step;
-	private float speed;
-	private float length;
-	private int width;
-	private boolean growing;
-	private boolean touched;
-	private boolean dead;
-	private float lifeTime;
 
-	public Lazer(Vector2 origin, Vector2 dest, float speed, float length,
-			int width) {
+	/**
+	 * Lazer move speed
+	 */
+	private float speed;
+
+	/**
+	 * Length of the lazer
+	 */
+	private float length;
+
+	/**
+	 * Strength of the lazer (number of enemy the lazer can touch)
+	 */
+	private int strength;
+
+	/**
+	 * Number of enemy touched by the lazer
+	 */
+	private int shootCount;
+
+	/**
+	 * True if the lazer is growing to its length
+	 */
+	private boolean growing;
+
+	/**
+	 * True if the lazer has reached its destination
+	 */
+	private boolean touched;
+
+	/**
+	 * True if the lazer has to be removed
+	 */
+	private boolean dead;
+
+	/**
+	 * True if the lazer can't touched enemy anymore
+	 */
+	private boolean disable;
+
+	public Lazer(Vector2 origin, Vector2 dest, float speed, float length, int strength) {
 		super();
 		this.origin = origin;
 		this.dest = dest;
 		this.speed = speed;
 		this.length = length;
-		this.width = width;
+		this.strength = strength;
 		this.head = new Vector2(origin);
 		this.queue = new Vector2(origin);
 		this.growing = true;
@@ -53,6 +82,15 @@ public class Lazer {
 					dead = true;
 				}
 			}
+		}
+	}
+
+	/**
+	 * Decrease the strength of the lazer by 1
+	 */
+	public void decreaseStrength() {
+		if (strength > 1) {
+			this.strength--;
 		}
 	}
 
@@ -104,12 +142,12 @@ public class Lazer {
 		this.length = length;
 	}
 
-	public int getWidth() {
-		return width;
+	public int getStrength() {
+		return strength;
 	}
 
-	public void setWidth(int width) {
-		this.width = width;
+	public void setStrength(int strength) {
+		this.strength = strength;
 	}
 
 	public boolean isDead() {
@@ -122,7 +160,23 @@ public class Lazer {
 
 	@Override
 	public String toString() {
-		return "Lazer [origin=" + origin + ", dest=" + dest + ", speed=" + speed + ", length=" + length + ", width=" + width + "]";
+		return "Lazer [origin=" + origin + ", dest=" + dest + ", speed=" + speed + ", length=" + length + ", width=" + strength + "]";
+	}
+
+	public int getShootCount() {
+		return shootCount;
+	}
+
+	public void setShootCount(int shootCount) {
+		this.shootCount = shootCount;
+	}
+
+	public boolean isDisable() {
+		return disable;
+	}
+
+	public void setDisable(boolean disable) {
+		this.disable = disable;
 	}
 
 }

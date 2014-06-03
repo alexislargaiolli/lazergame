@@ -20,6 +20,7 @@ import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 
+import fr.alex.games.entities.Canon;
 import fr.alex.games.entities.Enemy;
 import fr.alex.games.entities.Lazer;
 
@@ -43,13 +44,11 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	List<Enemy> deadEnemies;
 
 	Level level;
-
-	Vector2 origin;
-
-	private float height, width;
+	Canon canon;
 
 	private boolean touched;
 	private float deltaTouched;
+	private float drainedEnery;
 
 	private int score;
 	private int life;
@@ -60,10 +59,9 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		batch = new SpriteBatch();
 		renderer = new ShapeRenderer();
 
-		height = Gdx.graphics.getHeight();
-		width = Gdx.graphics.getWidth();
+		GlobalSettings.width = Gdx.graphics.getWidth();
+		GlobalSettings.height = Gdx.graphics.getHeight();
 
-		origin = new Vector2(width * .5f, 0);
 		Gdx.input.setInputProcessor(this);
 
 		camera = new OrthographicCamera();
@@ -76,6 +74,7 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		bf = new BitmapFont();
 
 		debugRenderer = new Box2DDebugRenderer();
+		canon = new Canon(new Vector2(GlobalSettings.width * .5f, 0));
 		init();
 	}
 
@@ -85,6 +84,7 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		enemies = new ArrayList<Enemy>();
 		deadEnemies = new ArrayList<Enemy>();
 		life = 3;
+		level.nextVague();
 	}
 
 	@Override
@@ -95,11 +95,25 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 
 	private void update(float delta) {
 		level.getWorld().step(BOX_STEP, BOX_VELOCITY_ITERATIONS, BOX_POSITION_ITERATIONS);
+		level.update(delta);
+		if (level.getCurrentVague() != null) {
+			if (level.getCurrentVague().isOver()) {
+				level.nextVague();
+			} else {
+				enemies.addAll(level.getCurrentVague().getEnemiesToSpawn());
+				level.getCurrentVague().getEnemiesToSpawn().clear();
+			}
+		}
 		updateLazer(delta);
 		updateEnemies(delta);
 
 		if (touched) {
 			deltaTouched += delta;
+			drainedEnery += delta;
+			if (drainedEnery - .2f > 0) {
+				canon.decreaseEnergy();
+				drainedEnery = 0;
+			}
 		}
 	}
 
@@ -107,17 +121,24 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		Gdx.gl.glClearColor(0, 0, 0, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 		batch.begin();
-		bf.draw(batch, "Score: " + score, 10, height - 10);
-		bf.draw(batch, "Life: " + life, 10, height - 30);
-		bf.draw(batch, "Bodies count: " + level.getWorld().getContactCount(), 10, height - 50);
-		bf.draw(batch, "Enemies count: " + enemies.size(), 10, height - 70);
-		
+		if (!level.isOver()) {
+			bf.draw(batch, "Vague: " + level.getCurrentVague().getIndex(), 10, GlobalSettings.height - 10);
+		}
+		else{
+			bf.draw(batch, "Vague: terminé", 10, GlobalSettings.height - 10);
+		}
+		bf.draw(batch, "Score: " + score, 10, GlobalSettings.height - 30);
+		bf.draw(batch, "Life: " + life, 10, GlobalSettings.height - 50);
+		bf.draw(batch, "Energy: " + canon.getEnergy() + "%", 10, GlobalSettings.height - 70);
+		bf.draw(batch, "Bodies count: " + level.getWorld().getContactCount(), 10, GlobalSettings.height - 90);
+		bf.draw(batch, "Enemies count: " + enemies.size(), 10, GlobalSettings.height - 110);
+
 		batch.end();
 		renderer.begin(ShapeType.Line);
 		for (int i = 0; i < lazers.size(); ++i) {
 			Lazer lazer = lazers.get(i);
-			renderer.line(lazer.getQueue().x - lazer.getWidth() * .5f, lazer.getQueue().y, lazer.getHead().x - lazer.getWidth() * .5f, lazer.getHead().y);
-			renderer.line(lazer.getQueue().x + lazer.getWidth() * .5f, lazer.getQueue().y, lazer.getHead().x + lazer.getWidth() * .5f, lazer.getHead().y);
+			renderer.line(lazer.getQueue().x - lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x - lazer.getStrength(), lazer.getHead().y);
+			renderer.line(lazer.getQueue().x + lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x + lazer.getStrength(), lazer.getHead().y);
 		}
 
 		for (int i = 0; i < enemies.size(); ++i) {
@@ -133,22 +154,12 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		for (int i = 0; i < lazers.size(); ++i) {
 			Lazer lazer = lazers.get(i);
 			lazer.update(delta);
-			for (int j = 0; j < enemies.size(); ++j) {
-				Enemy enemy = enemies.get(j);
-				if (!enemy.isDead() && enemy.hit(lazer)) {
-					shootEnemy(enemy);
-					for (int k = 0; k < enemies.size(); ++k) {
-						Enemy cur = enemies.get(k);
-						float dst = cur.getBody().getPosition().dst(enemy.getBody().getPosition());
-						if (dst < 100) {
 
-							Vector2 force = new Vector2(cur.getBody().getPosition()).sub(enemy.getBody().getPosition()).nor().scl(500000 * dst / 100);
-
-							Gdx.app.log("force applied", force.toString());
-
-							cur.getBody().applyLinearImpulse(force, cur.getBody().getWorldCenter(), true);
-
-						}
+			if (!lazer.isDisable()) {
+				for (int j = 0; j < enemies.size(); ++j) {
+					Enemy enemy = enemies.get(j);
+					if (!enemy.isDead() && enemy.hit(lazer)) {
+						shootEnemy(lazer, enemy);
 					}
 				}
 			}
@@ -177,20 +188,62 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		deadEnemies.clear();
 	}
 
+	/**
+	 * 
+	 * @param enemy
+	 */
 	private void destroyEnemy(Enemy enemy) {
-		level.getWorld().destroyBody(enemy.getBody());		
+		level.getWorld().destroyBody(enemy.getBody());
 		enemies.remove(enemy);
 	}
 
-	private void shootEnemy(Enemy enemy) {
+	/**
+	 * Handle collision between a lazer and an enemy
+	 * 
+	 * @param lazer
+	 * @param enemy
+	 */
+	private void shootEnemy(Lazer lazer, Enemy enemy) {
 		enemy.looseLife();
+		lazer.decreaseStrength();
+		if (lazer.getStrength() == 1) {
+			Vector2 nearest = new Vector2();
+			nearest = Intersector.nearestSegmentPoint(lazer.getQueue(), lazer.getHead(), enemy.getBody().getPosition(), nearest);
+			lazer.setHead(nearest);
+			lazer.setDest(nearest);
+			lazer.setDisable(true);
+		}
 		if (enemy.isDead()) {
 			deadEnemies.add(enemy);
 			score++;
+			exploseEnemy(enemy);
 		}
 	}
 
-	private void looseEnemy(Enemy enemy) {		
+	/**
+	 * Handle explosion of a enemy
+	 * 
+	 * @param enemy
+	 */
+	private void exploseEnemy(Enemy enemy) {
+		for (int k = 0; k < enemies.size(); ++k) {
+			Enemy cur = enemies.get(k);
+			if (!cur.isDead()) {
+				float dst = cur.getBody().getPosition().dst(enemy.getBody().getPosition());
+				if (dst < 100) {
+
+					Vector2 force = new Vector2(cur.getBody().getPosition()).sub(enemy.getBody().getPosition()).nor().scl(500000 * dst / 100);
+
+					Gdx.app.log("force applied", force.toString());
+
+					cur.getBody().applyLinearImpulse(force, cur.getBody().getWorldCenter(), true);
+
+				}
+			}
+		}
+	}
+
+	private void looseEnemy(Enemy enemy) {
 		deadEnemies.add(enemy);
 		life--;
 	}
@@ -204,25 +257,22 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		enemies.add(enemy);
 	}
 
-	public void spawnLazer(Vector2 dest, float speed) {
-
-		Vector2 intersection = new Vector2();
-		Intersector.intersectLines(origin.x, origin.y, dest.x, dest.y, 0, 0, 0, height, intersection);
-		if (intersection.y < 0 || intersection.y > height) {
-			Intersector.intersectLines(origin.x, origin.y, dest.x, dest.y, width, 0, width, height, intersection);
-			if (intersection.y < 0 || intersection.y > height) {
-				Intersector.intersectLines(origin.x, origin.y, dest.x, dest.y, 0, height, width, height, intersection);
-			}
-		}
-		int lazerWidth = Math.round(1 + deltaTouched * 1.5f);
-		Lazer lazer = new Lazer(origin, intersection, speed, 100, lazerWidth);
-		Gdx.app.log("spawnLazer()", lazer.toString());
-		lazers.add(lazer);
+	@Override
+	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+		touched = true;
+		return false;
 	}
 
 	@Override
-	public boolean keyDown(int keycode) {
-		// TODO Auto-generated method stub
+	public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+		Vector2 lazerDest = new Vector2(screenX, Gdx.graphics.getHeight() - screenY);
+		float lazerSpeed = canon.clickTimeToLazerSpeed(deltaTouched);
+		int lazerStrength = canon.clickTimeToLazerStrength(deltaTouched);
+		Lazer lazer = canon.fire(lazerDest, lazerSpeed, lazerStrength);
+		lazers.add(lazer);
+		touched = false;
+		deltaTouched = 0;
+		drainedEnery = 0;
 		return false;
 	}
 
@@ -237,40 +287,32 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	}
 
 	@Override
+	public boolean keyDown(int keycode) {
+
+		return false;
+	}
+
+	@Override
 	public boolean keyTyped(char character) {
-		// TODO Auto-generated method stub
-		return false;
-	}
 
-	@Override
-	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-		touched = true;
-		return false;
-	}
-
-	@Override
-	public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-		spawnLazer(new Vector2(screenX, Gdx.graphics.getHeight() - screenY), 500f);
-		touched = false;
-		deltaTouched = 0;
 		return false;
 	}
 
 	@Override
 	public boolean touchDragged(int screenX, int screenY, int pointer) {
-		// TODO Auto-generated method stub
+
 		return false;
 	}
 
 	@Override
 	public boolean mouseMoved(int screenX, int screenY) {
-		// TODO Auto-generated method stub
+
 		return false;
 	}
 
 	@Override
 	public boolean scrolled(int amount) {
-		// TODO Auto-generated method stub
+
 		return false;
 	}
 

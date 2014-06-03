@@ -25,10 +25,9 @@ public class Enemy {
 		fixtureDef.friction = 0f;
 		fixtureDef.restitution = .1f;
 		body.createFixture(fixtureDef);
-
 	}
 
-	public boolean hit(Lazer lazer) {
+	public boolean hit(Lazer lazer) {		
 		return Intersector.distanceSegmentPoint(lazer.getQueue(), lazer.getHead(), body.getPosition()) < radius;
 	}
 
