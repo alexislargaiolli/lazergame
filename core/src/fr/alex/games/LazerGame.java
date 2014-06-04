@@ -13,7 +13,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
-import com.badlogic.gdx.math.Intersector;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
@@ -23,6 +23,8 @@ import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import fr.alex.games.entities.Canon;
 import fr.alex.games.entities.Enemy;
 import fr.alex.games.entities.Lazer;
+import fr.alex.games.entities.Primes;
+import fr.alex.games.level.Level;
 
 public class LazerGame extends ApplicationAdapter implements InputProcessor {
 
@@ -43,6 +45,9 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	List<Enemy> enemies;
 	List<Enemy> deadEnemies;
 
+	List<Primes> prismes;
+	List<Primes> deadPrismes;
+
 	Level level;
 	Canon canon;
 
@@ -61,6 +66,7 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 
 		GlobalSettings.width = Gdx.graphics.getWidth();
 		GlobalSettings.height = Gdx.graphics.getHeight();
+		GlobalSettings.viewport = new Rectangle(0, 0, GlobalSettings.width, GlobalSettings.height);
 
 		Gdx.input.setInputProcessor(this);
 
@@ -83,6 +89,14 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		deadLazers = new ArrayList<Lazer>();
 		enemies = new ArrayList<Enemy>();
 		deadEnemies = new ArrayList<Enemy>();
+		prismes = new ArrayList<Primes>();
+		deadPrismes = new ArrayList<Primes>();
+
+		BodyDef bodyDef = new BodyDef();
+		bodyDef.position.set(new Vector2(200, 300));
+		Body body = level.getWorld().createBody(bodyDef);
+		prismes.add(new Primes(1, body));
+
 		life = 3;
 		level.nextVague();
 	}
@@ -123,8 +137,7 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		batch.begin();
 		if (!level.isOver()) {
 			bf.draw(batch, "Vague: " + level.getCurrentVague().getIndex(), 10, GlobalSettings.height - 10);
-		}
-		else{
+		} else {
 			bf.draw(batch, "Vague: terminé", 10, GlobalSettings.height - 10);
 		}
 		bf.draw(batch, "Score: " + score, 10, GlobalSettings.height - 30);
@@ -140,7 +153,13 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 			renderer.line(lazer.getQueue().x - lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x - lazer.getStrength(), lazer.getHead().y);
 			renderer.line(lazer.getQueue().x + lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x + lazer.getStrength(), lazer.getHead().y);
 		}
+		renderer.end();
 
+		renderer.begin(ShapeType.Filled);
+		for (int j = 0; j < prismes.size(); ++j) {
+			Primes p = prismes.get(j);
+			renderer.circle(p.getCenter().x, p.getCenter().y, 5f);
+		}
 		for (int i = 0; i < enemies.size(); ++i) {
 			Enemy enemy = enemies.get(i);
 			renderer.circle(enemy.x(), enemy.y(), enemy.getRadius());
@@ -154,17 +173,26 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		for (int i = 0; i < lazers.size(); ++i) {
 			Lazer lazer = lazers.get(i);
 			lazer.update(delta);
-
-			if (!lazer.isDisable()) {
-				for (int j = 0; j < enemies.size(); ++j) {
-					Enemy enemy = enemies.get(j);
-					if (!enemy.isDead() && enemy.hit(lazer)) {
-						shootEnemy(lazer, enemy);
-					}
-				}
+			if (isLazerOutOfBound(lazer)) {
+				lazer.setDead(true);
 			}
 			if (lazer.isDead()) {
 				deadLazers.add(lazer);
+			} else {
+				if (!lazer.isDisable()) {
+					for (int j = 0; j < enemies.size(); ++j) {
+						Enemy enemy = enemies.get(j);
+						if (!enemy.isDead() && enemy.hit(lazer)) {
+							shootEnemy(lazer, enemy);
+						}
+					}
+					for (int j = 0; j < prismes.size(); ++j) {
+						Primes prisme = prismes.get(j);
+						if (lazer.getFromId() != prisme.getPrismeId() && prisme.hit(lazer)) {
+							shootPrisme(lazer, prisme);
+						}
+					}
+				}
 			}
 		}
 		for (int i = 0; i < deadLazers.size(); ++i) {
@@ -206,12 +234,8 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	private void shootEnemy(Lazer lazer, Enemy enemy) {
 		enemy.looseLife();
 		lazer.decreaseStrength();
-		if (lazer.getStrength() == 1) {
-			Vector2 nearest = new Vector2();
-			nearest = Intersector.nearestSegmentPoint(lazer.getQueue(), lazer.getHead(), enemy.getBody().getPosition(), nearest);
-			lazer.setHead(nearest);
-			lazer.setDest(nearest);
-			lazer.setDisable(true);
+		if (lazer.getStrength() == 1) {			
+			lazer.stop();
 		}
 		if (enemy.isDead()) {
 			deadEnemies.add(enemy);
@@ -231,13 +255,9 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 			if (!cur.isDead()) {
 				float dst = cur.getBody().getPosition().dst(enemy.getBody().getPosition());
 				if (dst < 100) {
-
-					Vector2 force = new Vector2(cur.getBody().getPosition()).sub(enemy.getBody().getPosition()).nor().scl(500000 * dst / 100);
-
+					Vector2 force = new Vector2(cur.getBody().getPosition()).sub(enemy.getBody().getPosition()).nor().scl(500000 * dst);
 					Gdx.app.log("force applied", force.toString());
-
 					cur.getBody().applyLinearImpulse(force, cur.getBody().getWorldCenter(), true);
-
 				}
 			}
 		}
@@ -257,6 +277,21 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		enemies.add(enemy);
 	}
 
+	private void shootPrisme(Lazer lazer, Primes prisme) {
+		lazer.stop();
+		lazer.setFromId(prisme.getPrismeId());
+		for (int i = 0; i < prisme.getSpawnPoints().length; ++i) {			
+			Lazer l = new Lazer(prisme.getCenter(), prisme.getSpawnPoints()[i], lazer.getSpeed(), lazer.getLength(), lazer.getStrength());
+			l.setFromId(prisme.getPrismeId());
+			lazers.add(l);
+		}
+		Gdx.app.log("prisme", "");
+	}
+
+	public boolean isLazerOutOfBound(Lazer lazer) {
+		return !GlobalSettings.viewport.contains(lazer.getHead()) && !GlobalSettings.viewport.contains(lazer.getQueue());
+	}
+
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
 		touched = true;
@@ -268,8 +303,7 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		Vector2 lazerDest = new Vector2(screenX, Gdx.graphics.getHeight() - screenY);
 		float lazerSpeed = canon.clickTimeToLazerSpeed(deltaTouched);
 		int lazerStrength = canon.clickTimeToLazerStrength(deltaTouched);
-		Lazer lazer = canon.fire(lazerDest, lazerSpeed, lazerStrength);
-		lazers.add(lazer);
+		lazers.addAll(canon.fire(lazerDest, lazerSpeed, lazerStrength));
 		touched = false;
 		deltaTouched = 0;
 		drainedEnery = 0;

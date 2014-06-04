@@ -1,13 +1,18 @@
 package fr.alex.games.entities;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.math.Intersector;
-import com.badlogic.gdx.math.Vector2;
+import java.util.ArrayList;
+import java.util.List;
 
-import fr.alex.games.GlobalSettings;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.math.Interpolation;
+import com.badlogic.gdx.math.Vector2;
 
 public class Canon {
 	private Vector2 lazerOrigin;
+	/**
+	 * Number of lazers the canon shoot on each shot
+	 */
+	private int lazerCount;
 	private int energy;
 	private int MAX_ENERGY;
 
@@ -16,37 +21,43 @@ public class Canon {
 		this.lazerOrigin = lazerOrigin;
 		MAX_ENERGY = 100;
 		energy = MAX_ENERGY;
+		lazerCount = 1;
 	}
-	
-	public Lazer fire(Vector2 dest, float speed, int strength) {
-		Vector2 intersection = new Vector2();
-		Intersector.intersectLines(lazerOrigin.x, lazerOrigin.y, dest.x, dest.y, 0, 0, 0, GlobalSettings.height, intersection);
-		if (intersection.y < 0 || intersection.y > GlobalSettings.height) {
-			Intersector.intersectLines(lazerOrigin.x, lazerOrigin.y, dest.x, dest.y, GlobalSettings.width, 0, GlobalSettings.width, GlobalSettings.height, intersection);
-			if (intersection.y < 0 || intersection.y > GlobalSettings.height) {
-				Intersector.intersectLines(lazerOrigin.x, lazerOrigin.y, dest.x, dest.y, 0, GlobalSettings.height, GlobalSettings.width, GlobalSettings.height, intersection);
+
+	public List<Lazer> fire(Vector2 dest, float speed, int strength) {
+		List<Lazer> lazers = new ArrayList<Lazer>();
+		if (lazerCount == 1) {
+			Lazer lazer = new Lazer(lazerOrigin, dest, speed, 100, strength);
+			lazers.add(lazer);
+			Gdx.app.log("lazer spawn", lazer.toString());
+		} else {
+			for(int i=0; i<lazerCount; ++i){
+				float deltaX = Interpolation.linear.apply(-20, 20, (float)i/((float)lazerCount-1));
+				Vector2 ori = new Vector2(lazerOrigin.x + deltaX, lazerOrigin.y);
+				Vector2 des = new Vector2(dest.x + deltaX, dest.y);
+				Lazer lazer = new Lazer(ori, des, speed, 100, strength);
+				Gdx.app.log("lazer spawn", lazer.toString());
+				lazers.add(lazer);
 			}
 		}
-		Lazer lazer = new Lazer(lazerOrigin, intersection, speed, 100, strength);
-		Gdx.app.log("spawnLazer()", lazer.toString());
-		return lazer;
+		return lazers;
 	}
-	
-	public float clickTimeToLazerSpeed(float clickedTime){
+
+	public float clickTimeToLazerSpeed(float clickedTime) {
 		return 500f;
 	}
-	
-	public int clickTimeToLazerStrength(float clickedTime){
+
+	public int clickTimeToLazerStrength(float clickedTime) {
 		return Math.round(1 + clickedTime * 3f);
 	}
 
 	/**
-	 * Decrease canon energy by 1 
+	 * Decrease canon energy by 1
 	 */
-	public void decreaseEnergy(){
+	public void decreaseEnergy() {
 		energy--;
 	}
-	
+
 	public int getEnergy() {
 		return energy;
 	}

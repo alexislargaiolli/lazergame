@@ -1,4 +1,4 @@
-package fr.alex.games;
+package fr.alex.games.level;
 
 import java.util.ArrayList;
 import java.util.List;

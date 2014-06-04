@@ -13,10 +13,10 @@ public class Enemy {
 	private int DEFAULT_LIFE_COUNT;
 
 	public Enemy(Body b, int life) {
-		body = b;				
+		body = b;
 		DEFAULT_LIFE_COUNT = life;
 		lifeCount = DEFAULT_LIFE_COUNT;
-		radius = 10f * lifeCount;
+		computeRadius();
 		CircleShape dynamicCircle = new CircleShape();
 		dynamicCircle.setRadius(radius);
 		FixtureDef fixtureDef = new FixtureDef();
@@ -27,23 +27,27 @@ public class Enemy {
 		body.createFixture(fixtureDef);
 	}
 
-	public boolean hit(Lazer lazer) {		
+	private void computeRadius() {
+		radius = 20f + (lifeCount * 8f);
+	}
+
+	public boolean hit(Lazer lazer) {
 		return Intersector.distanceSegmentPoint(lazer.getQueue(), lazer.getHead(), body.getPosition()) < radius;
 	}
 
-	public void looseLife(){
-		if(lifeCount > 0){
+	public void looseLife() {
+		if (lifeCount > 0) {
 			lifeCount--;
-			radius = 10f * lifeCount;
+			computeRadius();
 			((CircleShape) body.getFixtureList().get(0).getShape()).setRadius(radius);
-			if(lifeCount <= 0){
+			if (lifeCount <= 0) {
 				dead = true;
 			}
 		}
 	}
-	
+
 	public float x() {
-		return body.getPosition().x ;
+		return body.getPosition().x;
 	}
 
 	public float y() {

@@ -1,4 +1,4 @@
-package fr.alex.games;
+package fr.alex.games.level;
 
 public class SpawnInfo {
 	float timeSpawn;

@@ -30,16 +30,6 @@ public class Lazer {
 	private int shootCount;
 
 	/**
-	 * True if the lazer is growing to its length
-	 */
-	private boolean growing;
-
-	/**
-	 * True if the lazer has reached its destination
-	 */
-	private boolean touched;
-
-	/**
 	 * True if the lazer has to be removed
 	 */
 	private boolean dead;
@@ -48,6 +38,10 @@ public class Lazer {
 	 * True if the lazer can't touched enemy anymore
 	 */
 	private boolean disable;
+
+	private boolean stop;
+	
+	private int fromId;
 
 	public Lazer(Vector2 origin, Vector2 dest, float speed, float length, int strength) {
 		super();
@@ -58,33 +52,33 @@ public class Lazer {
 		this.strength = strength;
 		this.head = new Vector2(origin);
 		this.queue = new Vector2(origin);
-		this.growing = true;
 		this.dead = false;
-		this.touched = false;
+		this.fromId = -1;
+		computeDirection();
+	}
+
+	public void computeDirection() {
 		this.direction = new Vector2(dest).sub(origin).nor();
 	}
 
 	public void update(float delta) {
-		if (!dead) {
-			if (growing) {
-				this.head.x += direction.x * speed * delta;
-				this.head.y += direction.y * speed * delta;
-				growing = !(head.dst(queue) >= length);
-			} else {
-				if (!touched) {
-					this.head.x += direction.x * speed * delta;
-					this.head.y += direction.y * speed * delta;
-					touched = head.dst(dest) < 10;
-				}
-				this.queue.x += direction.x * speed * delta;
-				this.queue.y += direction.y * speed * delta;
-				if (queue.dst(dest) < 10) {
-					dead = true;
-				}
-			}
+		if (!stop) {
+			this.head.x += direction.x * speed * delta;
+			this.head.y += direction.y * speed * delta;
+		}
+		if (head.dst(queue) >= length || stop) {
+			this.queue.x += direction.x * speed * delta;
+			this.queue.y += direction.y * speed * delta;
+		}
+		if (stop && queue.dst(head) < 10) {
+			dead = true;
 		}
 	}
 
+	public void stop(){
+		stop = true;
+	}
+	
 	/**
 	 * Decrease the strength of the lazer by 1
 	 */
@@ -177,6 +171,14 @@ public class Lazer {
 
 	public void setDisable(boolean disable) {
 		this.disable = disable;
+	}
+
+	public int getFromId() {
+		return fromId;
+	}
+
+	public void setFromId(int fromId) {
+		this.fromId = fromId;
 	}
 
 }
