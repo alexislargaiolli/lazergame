@@ -21,7 +21,7 @@ public class Canon {
 		this.lazerOrigin = lazerOrigin;
 		MAX_ENERGY = 100;
 		energy = MAX_ENERGY;
-		lazerCount = 3;
+		lazerCount = 1;
 	}
 
 	public List<Lazer> fire(Vector2 dest, float speed, int strength) {
@@ -64,5 +64,13 @@ public class Canon {
 
 	public void setEnergy(int energy) {
 		this.energy = energy;
+	}
+
+	public Vector2 getLazerOrigin() {
+		return lazerOrigin;
+	}
+
+	public void setLazerOrigin(Vector2 lazerOrigin) {
+		this.lazerOrigin = lazerOrigin;
 	}
 }

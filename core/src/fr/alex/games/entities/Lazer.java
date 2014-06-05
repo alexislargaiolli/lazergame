@@ -18,6 +18,8 @@ public class Lazer {
 	 * Length of the lazer
 	 */
 	private float length;
+	
+	private float currentLength;
 
 	/**
 	 * Strength of the lazer (number of enemy the lazer can touch)
@@ -53,8 +55,8 @@ public class Lazer {
 		this.head = new Vector2(origin);
 		this.queue = new Vector2(origin);
 		this.dead = false;
-		this.fromId = -1;
-		computeDirection();
+		this.fromId = -1;		
+		computeDirection();		
 	}
 
 	public void computeDirection() {
@@ -62,15 +64,16 @@ public class Lazer {
 	}
 
 	public void update(float delta) {
+		currentLength = head.dst(queue);
 		if (!stop) {
 			this.head.x += direction.x * speed * delta;
 			this.head.y += direction.y * speed * delta;
 		}
-		if (head.dst(queue) >= length || stop) {
+		if (currentLength >= length || stop) {
 			this.queue.x += direction.x * speed * delta;
 			this.queue.y += direction.y * speed * delta;
 		}
-		if (stop && queue.dst(head) < 10) {
+		if (stop && currentLength < 10) {
 			dead = true;
 		}
 	}
@@ -187,6 +190,14 @@ public class Lazer {
 
 	public void setDirection(Vector2 direction) {
 		this.direction = direction;
+	}
+
+	public float getCurrentLength() {
+		return currentLength;
+	}
+
+	public void setCurrentLength(float currentLength) {
+		this.currentLength = currentLength;
 	}
 
 }

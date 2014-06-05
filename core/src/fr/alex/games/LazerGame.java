@@ -3,16 +3,24 @@ package fr.alex.games;
 import java.util.ArrayList;
 import java.util.List;
 
+import box2dLight.ConeLight;
+import box2dLight.Light;
+import box2dLight.PointLight;
+import box2dLight.RayHandler;
+
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputProcessor;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
@@ -36,6 +44,7 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 
 	Box2DDebugRenderer debugRenderer;
 	OrthographicCamera camera;
+	public static RayHandler rayHandler;
 
 	SpriteBatch batch;
 	ShapeRenderer renderer;
@@ -54,6 +63,10 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	private boolean touched;
 	private float deltaTouched;
 	private float drainedEnery;
+	private Texture bg;
+	private Texture ast;
+	private Texture prisme;
+	private Texture lazerText;
 
 	private int score;
 	private int life;
@@ -63,6 +76,10 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	public void create() {
 		batch = new SpriteBatch();
 		renderer = new ShapeRenderer();
+		bg = new Texture(Gdx.files.internal("bg.png"));
+		ast = new Texture(Gdx.files.internal("ast1.png"));
+		prisme = new Texture(Gdx.files.internal("prisme.png"));
+		lazerText = new Texture(Gdx.files.internal("lazer.png"));
 
 		GlobalSettings.width = Gdx.graphics.getWidth();
 		GlobalSettings.height = Gdx.graphics.getHeight();
@@ -78,6 +95,14 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 
 		level = new Level();
 		bf = new BitmapFont();
+
+		RayHandler.setGammaCorrection(true);
+		RayHandler.useDiffuseLight(true);
+		rayHandler = new RayHandler(level.getWorld());
+		rayHandler.setAmbientLight(.5f, .5f, .5f, .5f);
+		rayHandler.setCulling(false);
+		rayHandler.setBlur(true);
+		rayHandler.setBlurNum(1);
 
 		debugRenderer = new Box2DDebugRenderer();
 		canon = new Canon(new Vector2(GlobalSettings.width * .5f, 0));
@@ -95,7 +120,14 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		BodyDef bodyDef = new BodyDef();
 		bodyDef.position.set(new Vector2(200, 300));
 		Body body = level.getWorld().createBody(bodyDef);
+
+		Light light = new PointLight(rayHandler, 32);
+		light.setDistance(16f);
+		light.attachToBody(body, 0, 0.5f);
+		light.setColor(MathUtils.random(), MathUtils.random(), MathUtils.random(), 1f);
+
 		prismes.add(new Primes(1, body));
+		new PointLight(rayHandler, 32);
 
 		life = 3;
 		level.nextVague();
@@ -109,12 +141,20 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 
 	private void update(float delta) {
 		level.getWorld().step(BOX_STEP, BOX_VELOCITY_ITERATIONS, BOX_POSITION_ITERATIONS);
+		rayHandler.update();
 		level.update(delta);
+
 		if (level.getCurrentVague() != null) {
 			if (level.getCurrentVague().isOver()) {
 				level.nextVague();
 			} else {
-				enemies.addAll(level.getCurrentVague().getEnemiesToSpawn());
+				for (Enemy e : level.getCurrentVague().getEnemiesToSpawn()) {
+					Light light = new PointLight(rayHandler, 32);
+					light.setDistance(100f);
+					light.attachToBody(e.getBody(), 0, 0);
+					light.setColor(MathUtils.random(), MathUtils.random(), MathUtils.random(), 1f);
+					enemies.add(e);
+				}
 				level.getCurrentVague().getEnemiesToSpawn().clear();
 			}
 		}
@@ -134,6 +174,57 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	private void draw(float delta) {
 		Gdx.gl.glClearColor(0, 0, 0, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+		batch.setProjectionMatrix(camera.combined);
+		batch.begin();
+		batch.draw(bg, 0, 0, GlobalSettings.width, GlobalSettings.height);
+
+		// renderer.begin(ShapeType.Filled);
+		// batch.begin();
+		for (int j = 0; j < prismes.size(); ++j) {
+			Primes p = prismes.get(j);
+			batch.draw(prisme, p.getCenter().x, p.getCenter().y, 40, 30, 0, 0, 40, 30, false, false);
+			/*
+			 * renderer.circle(p.getCenter().x, p.getCenter().y, 5f);
+			 * renderer.circle(p.getVertices()[0], p.getVertices()[1], 5f);
+			 * renderer.circle(p.getVertices()[2], p.getVertices()[3], 5f);
+			 * renderer.circle(p.getVertices()[4], p.getVertices()[5], 5f);
+			 */
+		}
+
+		for (int i = 0; i < enemies.size(); ++i) {
+			Enemy enemy = enemies.get(i);
+			float x = enemy.getBody().getPosition().x;
+			float y = enemy.getBody().getPosition().y;
+			float width = enemy.getRadius() * 2f;
+			// batch.draw(ast, x, y, width, width, 0, 0, 130, 122, false,
+			// false);
+			batch.draw(ast, x - width * .5f, y - width * .5f, width * .5f, width * .5f, width, width, 1, 1, (float) Math.toDegrees(enemy.getBody().getAngle()), 0, 0, 130, 122, false, false);
+			// renderer.circle(enemy.x(), enemy.y(), enemy.getRadius());
+		}
+		
+		for (int i = 0; i < lazers.size(); ++i) {
+			Lazer lazer = lazers.get(i);
+			//renderer.line(lazer.getQueue().x - lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x - lazer.getStrength(), lazer.getHead().y);
+			//renderer.line(lazer.getQueue().x + lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x + lazer.getStrength(), lazer.getHead().y);
+		
+			batch.draw(lazerText, lazer.getQueue().x, lazer.getQueue().y, 0, 0, 10, lazer.getCurrentLength(), 1, 1, 90+lazer.getDirection().angle(), 0, 0, 20, 20, false, false);
+		}
+		// renderer.end();
+		batch.end();
+
+		rayHandler.setCombinedMatrix(camera.combined);
+		rayHandler.render();
+		debugRenderer.render(level.getWorld(), camera.combined);
+
+		/*renderer.begin(ShapeType.Line);
+		for (int i = 0; i < lazers.size(); ++i) {
+			Lazer lazer = lazers.get(i);
+			renderer.line(lazer.getQueue().x - lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x - lazer.getStrength(), lazer.getHead().y);
+			renderer.line(lazer.getQueue().x + lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x + lazer.getStrength(), lazer.getHead().y);
+		}
+		renderer.end();*/
+
 		batch.begin();
 		if (!level.isOver()) {
 			bf.draw(batch, "Vague: " + level.getCurrentVague().getIndex(), 10, GlobalSettings.height - 10);
@@ -147,29 +238,6 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		bf.draw(batch, "Enemies count: " + enemies.size(), 10, GlobalSettings.height - 110);
 
 		batch.end();
-		renderer.begin(ShapeType.Line);
-		for (int i = 0; i < lazers.size(); ++i) {
-			Lazer lazer = lazers.get(i);
-			renderer.line(lazer.getQueue().x - lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x - lazer.getStrength(), lazer.getHead().y);
-			renderer.line(lazer.getQueue().x + lazer.getStrength(), lazer.getQueue().y, lazer.getHead().x + lazer.getStrength(), lazer.getHead().y);
-		}
-		renderer.end();
-
-		renderer.begin(ShapeType.Filled);
-		for (int j = 0; j < prismes.size(); ++j) {
-			Primes p = prismes.get(j);
-			renderer.circle(p.getCenter().x, p.getCenter().y, 5f);
-			renderer.circle(p.getVertices()[0], p.getVertices()[1], 5f);
-			renderer.circle(p.getVertices()[2], p.getVertices()[3], 5f);
-			renderer.circle(p.getVertices()[4], p.getVertices()[5], 5f);
-		}
-		for (int i = 0; i < enemies.size(); ++i) {
-			Enemy enemy = enemies.get(i);
-			renderer.circle(enemy.x(), enemy.y(), enemy.getRadius());
-		}
-		renderer.end();
-
-		debugRenderer.render(level.getWorld(), camera.combined);
 	}
 
 	public void updateLazer(float delta) {
@@ -237,7 +305,7 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	private void shootEnemy(Lazer lazer, Enemy enemy) {
 		enemy.looseLife();
 		lazer.decreaseStrength();
-		if (lazer.getStrength() == 1) {			
+		if (lazer.getStrength() == 1) {
 			lazer.stop();
 		}
 		if (enemy.isDead()) {
@@ -260,7 +328,11 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 				if (dst < 100) {
 					Vector2 force = new Vector2(cur.getBody().getPosition()).sub(enemy.getBody().getPosition()).nor().scl(500000 * dst);
 					Gdx.app.log("force applied", force.toString());
-					cur.getBody().applyLinearImpulse(force, cur.getBody().getWorldCenter(), true);
+					// cur.getBody().applyLinearImpulse(force,
+					// cur.getBody().getWorldCenter(), true);
+					// cur.getBody().applyForceToCenter(force, true);
+
+					cur.getBody().applyForce(force, new Vector2(cur.getBody().getWorldCenter()).sub(10, 10), true);
 				}
 			}
 		}
@@ -284,11 +356,12 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		lazer.stop();
 		lazer.setFromId(prisme.getPrismeId());
 		lazers.addAll(prisme.handleHit(lazer));
-		/*for (int i = 0; i < prisme.getSpawnPoints().length; ++i) {			
-			Lazer l = new Lazer(prisme.getCenter(), prisme.getSpawnPoints()[i], lazer.getSpeed(), lazer.getLength(), lazer.getStrength());
-			l.setFromId(prisme.getPrismeId());
-			lazers.add(l);
-		}*/
+		/*
+		 * for (int i = 0; i < prisme.getSpawnPoints().length; ++i) { Lazer l =
+		 * new Lazer(prisme.getCenter(), prisme.getSpawnPoints()[i],
+		 * lazer.getSpeed(), lazer.getLength(), lazer.getStrength());
+		 * l.setFromId(prisme.getPrismeId()); lazers.add(l); }
+		 */
 		Gdx.app.log("prisme", "");
 	}
 
@@ -311,6 +384,9 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		touched = false;
 		deltaTouched = 0;
 		drainedEnery = 0;
+		Vector2 dir = new Vector2(lazerDest).sub(canon.getLazerOrigin());
+		//Light light = new ConeLight(rayHandler, 16, new Color(1f, 0, 0, 1f), 1, canon.getLazerOrigin().x, canon.getLazerOrigin().y, dir.angle(), 1);
+		
 		return false;
 	}
 
