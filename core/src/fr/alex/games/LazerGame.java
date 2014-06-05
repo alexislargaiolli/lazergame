@@ -159,6 +159,9 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 		for (int j = 0; j < prismes.size(); ++j) {
 			Primes p = prismes.get(j);
 			renderer.circle(p.getCenter().x, p.getCenter().y, 5f);
+			renderer.circle(p.getVertices()[0], p.getVertices()[1], 5f);
+			renderer.circle(p.getVertices()[2], p.getVertices()[3], 5f);
+			renderer.circle(p.getVertices()[4], p.getVertices()[5], 5f);
 		}
 		for (int i = 0; i < enemies.size(); ++i) {
 			Enemy enemy = enemies.get(i);
@@ -280,11 +283,12 @@ public class LazerGame extends ApplicationAdapter implements InputProcessor {
 	private void shootPrisme(Lazer lazer, Primes prisme) {
 		lazer.stop();
 		lazer.setFromId(prisme.getPrismeId());
-		for (int i = 0; i < prisme.getSpawnPoints().length; ++i) {			
+		lazers.addAll(prisme.handleHit(lazer));
+		/*for (int i = 0; i < prisme.getSpawnPoints().length; ++i) {			
 			Lazer l = new Lazer(prisme.getCenter(), prisme.getSpawnPoints()[i], lazer.getSpeed(), lazer.getLength(), lazer.getStrength());
 			l.setFromId(prisme.getPrismeId());
 			lazers.add(l);
-		}
+		}*/
 		Gdx.app.log("prisme", "");
 	}
 

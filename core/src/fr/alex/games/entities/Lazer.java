@@ -181,4 +181,12 @@ public class Lazer {
 		this.fromId = fromId;
 	}
 
+	public Vector2 getDirection() {
+		return direction;
+	}
+
+	public void setDirection(Vector2 direction) {
+		this.direction = direction;
+	}
+
 }

@@ -21,7 +21,7 @@ public class Canon {
 		this.lazerOrigin = lazerOrigin;
 		MAX_ENERGY = 100;
 		energy = MAX_ENERGY;
-		lazerCount = 1;
+		lazerCount = 3;
 	}
 
 	public List<Lazer> fire(Vector2 dest, float speed, int strength) {
@@ -32,7 +32,7 @@ public class Canon {
 			Gdx.app.log("lazer spawn", lazer.toString());
 		} else {
 			for(int i=0; i<lazerCount; ++i){
-				float deltaX = Interpolation.linear.apply(-20, 20, (float)i/((float)lazerCount-1));
+				float deltaX = Interpolation.linear.apply(-15, 15, (float)i/((float)lazerCount-1));
 				Vector2 ori = new Vector2(lazerOrigin.x + deltaX, lazerOrigin.y);
 				Vector2 des = new Vector2(dest.x + deltaX, dest.y);
 				Lazer lazer = new Lazer(ori, des, speed, 100, strength);
